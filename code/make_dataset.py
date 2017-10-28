@@ -1,5 +1,5 @@
-import pickle
 import os
+import pickle
 
 CATEGORIES = ["walking", "jogging", "running", "boxing", "handwaving", "handclapping"]
 DATASET_DIR = "../data"
