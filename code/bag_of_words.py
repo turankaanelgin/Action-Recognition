@@ -3,7 +3,9 @@ import pickle
 import argparse
 from collections import defaultdict
 from scipy.cluster.vq import vq
-from sklearn import svm
+from sklearn.svm import SVC
+from sklearn.multiclass import OneVsRestClassifier
+from sklearn.metrics import accuracy_score
 from numpy import zeros
 
 CATEGORIES = ["walking", "jogging", "running", "boxing", "handwaving", "handclapping"]
@@ -22,6 +24,12 @@ def load_data(clusters, n_samples):
     cluster_centers = kmeans.cluster_centers_
     return (train_sift, dev_sift, test_sift, cluster_centers)
 
+def true_labels(data):
+    labels = []
+    for video in data:
+        labels.append(video["category"])
+    return labels
+
 def compute_histograms(data, cluster_centers):
     # compute visual word histograms for each category of
     # training data
@@ -38,6 +46,8 @@ def compute_single_histogram(video, cluster_centers):
     frames = video["frames"]
     cnt = 1
     for frame in frames:
+        if len(frame) == 0:
+            continue
         clusters = vq(frame, cluster_centers)
         cluster_indices = clusters[0]
         for cluster in cluster_indices:
@@ -47,43 +57,43 @@ def compute_single_histogram(video, cluster_centers):
             print("Frame %d has been processed" % cnt)
     return histogram
 
-def svm_classifiers(histograms):
-    classifiers = {}
+def svm_classifier(histograms, kernel, C, gamma):
+    examples = []
+    labels = []
     for category in CATEGORIES:
-        print('Creating classifier for %s' % category)
-        clf = svm.SVC(probability=True)
-        examples = histograms[category]
-        labels = len(examples) * [1]
-        for other in CATEGORIES:
-            if category != other:
-                negatives = histograms[other]
-                examples += negatives
-                labels += len(negatives) * [0]
-        model = clf.fit(examples, labels)
-        classifiers[category] = model
-    return classifiers
+        new_examples = histograms[category].copy()
+        examples += new_examples
+        labels += len(new_examples) * [category]
+    classifier = OneVsRestClassifier(SVC(kernel=kernel, C=C, gamma=gamma), n_jobs=2)
+    classifier.fit(examples, labels)
+    return classifier
 
-def one_vs_all_classification(data, cluster_centers, classifiers):
-    predicted_labels = []
+def tune_svm_classifier(train_histograms, dev_data, dev_labels, cluster_centers):
+    dev_histograms = []
+    for video in dev_data:
+        histogram = compute_single_histogram(video, cluster_centers)
+        dev_histograms.append(histogram)
+    best_accuracy = 0
+    print('Performing validation...')
+    # Polynomial and rbf kernels did not give good results
+    for C in range(-4, 3):
+        for gamma in range(-4, 3):
+            classifier = svm_classifier(train_histograms, 'linear', 10**C, 2**gamma)
+            predicted_labels = classifier.predict(dev_histograms)
+            dev_accuracy = accuracy_score(dev_labels, predicted_labels)
+            print('Accuracy = %f with %s kernel, C = %f, gamma = %f' % (dev_accuracy, 'linear', 10**C, 2**gamma))
+            if dev_accuracy > best_accuracy:
+                best_accuracy = dev_accuracy
+                bestC = C
+                bestGamma = gamma
+    return bestC, bestGamma
+
+def classify(data, cluster_centers, classifier):
     histograms = []
     for video in data:
         histogram = compute_single_histogram(video, cluster_centers)
         histograms.append(histogram)
-    probs = []
-    for svc in classifiers.values():
-        prob = svc.predict_proba(histograms)
-        probs.append(prob)
-
-    for i in range(len(data)):
-        maxProb = 0
-        maxClass = ''
-        for j in range(len(probs)):
-            prob = probs[j][i][0]
-            if prob > maxProb:
-                maxProb = prob
-                maxClass = CATEGORIES[j]
-        predicted_labels.append(maxClass)
-    print(predicted_labels)
+    predicted_labels = classifier.predict(histograms)
     return predicted_labels
 
 if __name__ == "__main__":
@@ -97,9 +107,19 @@ if __name__ == "__main__":
     n_samples = args.n_samples
 
     train_sift, dev_sift, test_sift, cluster_centers = load_data(clusters, n_samples)
+    train_labels = true_labels(train_sift)
+    dev_labels = true_labels(dev_sift)
+    test_labels = true_labels(test_sift)
+
     train_histograms = compute_histograms(train_sift, cluster_centers)
-    classifiers = svm_classifiers(train_histograms)
-    predicted_labels = one_vs_all_classification(train_sift, cluster_centers, classifiers)
+    bestC, bestGamma = tune_svm_classifier(train_histograms, dev_sift, dev_labels, cluster_centers)
 
-
-
+    train_dev_histograms = compute_histograms(train_sift + dev_sift, cluster_centers)
+    classifier = svm_classifier(train_dev_histograms, 'linear', 10**bestC, 2**bestGamma)
+    test_histograms = []
+    for video in test_sift:
+        histogram = compute_single_histogram(video, cluster_centers)
+        test_histograms.append(histogram)
+    predicted_labels = classifier.predict(test_histograms)
+    test_accuracy = accuracy_score(test_labels, predicted_labels)
+    print('Test accuracy = %f' % test_accuracy)
