@@ -46,4 +46,4 @@ if __name__ == "__main__":
 	kmeans.fit(sampled_features)
 
 	# Save trained kmeans object to file.
-	pickle.dump(kmeans, open("train_kmeans_%dclusters.pickle" % clusters, "wb"))
+	pickle.dump(kmeans, open(os.path.join(DATASET_DIR, "train_kmeans_%dclusters_%dsamples.pickle" % (clusters, n_samples)), "wb"))
