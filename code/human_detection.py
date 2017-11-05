@@ -1,10 +1,10 @@
 import cv2
 import os
 import pickle
-import sys
 
-CATEGORIES = ["walking", "jogging", "running", "boxing", "handwaving", \
-														"handclapping"]
+# CATEGORIES = ["walking", "jogging", "running", "boxing", "handwaving", \
+# 														"handclapping"]
+CATEGORIES = ["walking"]
 
 DATASET_DIR = "../data"
 
@@ -55,8 +55,9 @@ if __name__ == "__main__":
 			# Read video.
 			file_path = os.path.join(DATASET_DIR, category, file_name)
 			vid = cv2.VideoCapture(file_path)
-	        
+
 			while vid.isOpened():
+				print('Hello')
 				# Read frame.
 				ret, frame = vid.read()
 				# Break if we got to the end of the video.
@@ -80,4 +81,4 @@ if __name__ == "__main__":
 
 		# Dump data to file.
 		pickle.dump(category_human_rects, open(os.path.join(DATASET_DIR, \
-			"human_rects_%s.pickle" % category), "wb"))
+			"human_detected_%s.pickle" % category), "wb"))

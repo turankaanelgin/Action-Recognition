@@ -1,0 +1,26 @@
+addpath('vlfeat-0.9.20/toolbox');
+load('../data/dataset.mat');
+
+binSize = 8;
+magnif = 3;
+step = 10;
+nrVideos = size(train_data, 1);
+siftFeatures = cell(nrVideos, 1);
+
+for i = 1:nrVideos
+    frames = train_data{i}.frames;
+    category = train_data{i}.category;
+    nrFrames = size(frames, 1);
+    siftPerVideo = cell(nrFrames, 1);
+    
+    for j = 1:nrFrames
+        frame = frames(i, :);
+        frame = reshape()
+        frame = im2single(frame);
+        frame = vl_imsmooth(frame, sqrt((binSize/magnif)^2 - .25));
+        [f, d] = vl_dsift(frame, 'size', binSize, 'step', step);
+        s1 = struct('f', f, 'd', d);
+        siftPerVideo{j} = s1;
+    end
+    siftFeatures{i} = siftPerVideo;
+end

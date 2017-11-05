@@ -4,9 +4,25 @@ import os
 import pickle
 
 from sklearn.cluster import KMeans
+from numpy import size
 
 CATEGORIES = ["walking", "jogging", "running", "boxing", "handwaving", "handclapping"]
 DATASET_DIR = "../data"
+
+def combine_flows(data_x, data_y):
+	optical_flows = []
+	for i in range(len(data_x)):
+		video_x = data_x[i]
+		video_y = data_y[i]
+		flows_per_video = []
+		for j in range(len(video_x)):
+			flows_x = video_x[j]
+			flows_y = video_y[j]
+			flows = list(zip(flows_x, flows_y))
+			flows_per_video.append(flows)
+		optical_flows.append(flows_per_video)
+	return optical_flows
+
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description="Run KMeans on training set")
@@ -22,11 +38,14 @@ if __name__ == "__main__":
 	train_features = []
 
 	print("Loading train_sift.pickle")
-	train_data = pickle.load(open(os.path.join(DATASET_DIR, "train_sift.pickle"), "rb"))
+	#train_data = pickle.load(open(os.path.join(DATASET_DIR, "train_sift.pickle"), "rb"))
+	train_data_x = pickle.load(open(os.path.join(DATASET_DIR, "train_dense_flow_x.pickle"), "rb"))
+	train_data_y = pickle.load(open(os.path.join(DATASET_DIR, "train_dense_flow_y.pickle"), "rb"))
+	train_data = combine_flows(train_data_x, train_data_y)
 
 	# Create lists of all features in training set.
 	for video in train_data:
-		for frame in video["frames"]:
+		for frame in video:
 			train_features += frame
 
 	n_features = len(train_features)

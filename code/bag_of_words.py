@@ -11,18 +11,47 @@ from numpy import zeros
 CATEGORIES = ["walking", "jogging", "running", "boxing", "handwaving", "handclapping"]
 DATASET_DIR = "../data"
 
+
+def combine_data(data_x, data_y, categories):
+    optical_flows = []
+    for i in range(len(data_x)):
+        video_x = data_x[i]
+        video_y = data_y[i]
+        flows_per_video = []
+        for j in range(len(video_x)):
+            flows_x = video_x[j]
+            flows_y = video_y[j]
+            flows = list(zip(flows_x, flows_y))
+            flows_per_video.append(flows)
+        optical_flows.append({'category': categories[i],
+                              'frames': flows_per_video})
+    return optical_flows
+
 def load_data(clusters, n_samples):
+    print('Loading categories...')
     print("Loading training set...")
-    train_sift = pickle.load(open(os.path.join(DATASET_DIR, "train_sift.pickle"), "rb"))
+    train_flow_x = pickle.load(open(os.path.join(DATASET_DIR, "train_dense_flow_x.pickle"), "rb"))
+    train_flow_y = pickle.load(open(os.path.join(DATASET_DIR, "train_dense_flow_y.pickle"), "rb"))
+    train_categories = pickle.load(open(os.path.join(DATASET_DIR, "train_categories"), "rb"))
+    train_flow = combine_data(train_flow_x, train_flow_y, train_categories)
+
     print("Loading development set...")
-    dev_sift = pickle.load(open(os.path.join(DATASET_DIR, "dev_sift.pickle"), "rb"))
+    dev_flow_x = pickle.load(open(os.path.join(DATASET_DIR, "dev_dense_flow_x.pickle"), "rb"))
+    dev_flow_y = pickle.load(open(os.path.join(DATASET_DIR, "dev_dense_flow_y.pickle"), "rb"))
+    dev_categories = pickle.load(open(os.path.join(DATASET_DIR, "dev_categories"), "rb"))
+    dev_flow = combine_data(dev_flow_x, dev_flow_y, dev_categories)
+
     print("Loading test set...")
-    test_sift = pickle.load(open(os.path.join(DATASET_DIR, "test_sift.pickle"), "rb"))
+    test_flow_x = pickle.load(open(os.path.join(DATASET_DIR, "test_dense_flow_x.pickle"), "rb"))
+    test_flow_y = pickle.load(open(os.path.join(DATASET_DIR, "test_dense_flow_y.pickle"), "rb"))
+    test_categories = pickle.load(open(os.path.join(DATASET_DIR, "test_categories"), "rb"))
+    test_flow = combine_data(test_flow_x, test_flow_y, test_categories)
+
     print("Loading kmeans model...")
     kmeans = pickle.load(open(os.path.join(DATASET_DIR, "train_kmeans_%dclusters_%dsamples.pickle" % \
                                            (clusters, n_samples)), "rb"))
     cluster_centers = kmeans.cluster_centers_
-    return (train_sift, dev_sift, test_sift, cluster_centers)
+    return (train_flow, dev_flow, test_flow, train_categories, dev_categories, test_categories, cluster_centers)
 
 def true_labels(data):
     labels = []
@@ -76,8 +105,8 @@ def tune_svm_classifier(train_histograms, dev_data, dev_labels, cluster_centers)
     best_accuracy = 0
     print('Performing validation...')
     # Polynomial and rbf kernels did not give good results
-    for C in range(-4, 3):
-        for gamma in range(-4, 3):
+    for C in range(-4, 1):
+        for gamma in range(-4, -3):
             classifier = svm_classifier(train_histograms, 'linear', 10**C, 2**gamma)
             predicted_labels = classifier.predict(dev_histograms)
             dev_accuracy = accuracy_score(dev_labels, predicted_labels)
@@ -106,10 +135,8 @@ if __name__ == "__main__":
     clusters = args.clusters
     n_samples = args.n_samples
 
-    train_sift, dev_sift, test_sift, cluster_centers = load_data(clusters, n_samples)
-    train_labels = true_labels(train_sift)
-    dev_labels = true_labels(dev_sift)
-    test_labels = true_labels(test_sift)
+    train_sift, dev_sift, test_sift, train_labels, dev_labels, test_labels, cluster_centers = \
+                                                                    load_data(clusters, n_samples)
 
     train_histograms = compute_histograms(train_sift, cluster_centers)
     bestC, bestGamma = tune_svm_classifier(train_histograms, dev_sift, dev_labels, cluster_centers)
