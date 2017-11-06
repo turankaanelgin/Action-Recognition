@@ -33,7 +33,7 @@ if __name__ == "__main__":
 		for category in CATEGORIES:
 			majority[category] = 0
         
-        # Predict every frame in this video.
+		# Predict every frame in this video.
 		for frame in video["frames"]:
 			predicted = clf.predict([frame])
 			# Increase vote.
