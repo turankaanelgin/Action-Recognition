@@ -108,18 +108,19 @@ if __name__ == "__main__":
 						# Convert to grayscale.
 						frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 						frames.append(frame)
-						file = {
-							"filename": filename,
-							"category": category,
-							"frames": frames
-						}
-						# Add to corresponding dataset.
-						if person_id in TRAIN_PEOPLE_ID:
-							train_set.append(file)
-						elif person_id in DEV_PEOPLE_ID:
-							dev_set.append(file)
-						else:
-							test_set.append(file)
+				
+				file = {
+					"filename": filename,
+					"category": category,
+					"frames": frames
+				}
+				# Add to corresponding dataset.
+				if person_id in TRAIN_PEOPLE_ID:
+					train_set.append(file)
+				elif person_id in DEV_PEOPLE_ID:
+					dev_set.append(file)
+				else:
+					test_set.append(file)
 
 	# Save to files.
 	print("Saving to file ../data/train_set_human_frame.pickle")

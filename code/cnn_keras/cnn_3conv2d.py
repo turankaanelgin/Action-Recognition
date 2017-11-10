@@ -1,5 +1,6 @@
-# Trained models can be downloaded at:
+# Trained model cnn_3conv2d_drop05_15.h5 can be downloaded at:
 # https://drive.google.com/open?id=14v9D__AlRU7JCg0s2-mF4Z-K5dL3G2Ht
+
 import numpy as np
 import keras
 from keras import layers
@@ -11,8 +12,8 @@ from keras.models import Model
 import pickle
 
 def load_dataset(dataset_name):
-	X = pickle.load(open("../../data/cnn_rawframe/X_" + dataset_name + ".pickle", "rb"))
-	Y = pickle.load(open("../../data/cnn_rawframe/Y_" + dataset_name + ".pickle", "rb"))
+	X = pickle.load(open("../../data/cnn_keras/X_" + dataset_name + ".pickle", "rb"))
+	Y = pickle.load(open("../../data/cnn_keras/Y_" + dataset_name + ".pickle", "rb"))
 	return X, Y
 
 def convert_to_one_hot(Y, n_classes):
@@ -38,7 +39,7 @@ def cnn_model(input_shape):
     X = Conv2D(256, (3, 3), strides=(1, 1))(X)
     X = Activation("relu")(X)
     X = MaxPooling2D((2, 2))(X)
-    X = Dropout(0.4)(X)
+    X = Dropout(0.5)(X)
 
     X = Flatten()(X)
     X = Dense(256, activation="relu")(X)
@@ -64,11 +65,10 @@ if __name__ == "__main__":
 	model.compile(optimizer="Adam", loss="categorical_crossentropy", metrics=["accuracy"])
 
 	# Create checkpoint to save model after each epoch.
-	filepath = "../../data/cnn_rawframe/cnn_3conv_drop04_{epoch:02d}.h5"
+	filepath = "../../data/cnn_keras/cnn_3conv_drop04_{epoch:02d}.h5"
 	checkpoint = ModelCheckpoint(filepath, verbose=1, period=1)
 
 	# Train.
-	history = model.fit(x=X_train, y=Y_train, epochs=10, batch_size=32,\
+	model.fit(x=X_train, y=Y_train, epochs=10, batch_size=32,\
 		callbacks=[checkpoint], validation_data=(X_dev, Y_dev))
-	pickle.dump(history, open("../../data/cnn_rawframe/hist_cnn_3conv_drop04.picle", "wb"))
 	
