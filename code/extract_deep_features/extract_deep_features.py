@@ -2,7 +2,8 @@ import imageio
 import numpy as np
 import os
 import pickle
-from pandas import read_csv, DataFrame 
+from pandas import read_csv, DataFrame
+from scipy.misc.pilutil import imresize
 
 from keras.applications.vgg16 import VGG16
 from keras.preprocessing import image
@@ -82,7 +83,7 @@ if __name__ == "__main__":
 
             frames = []
             for i, frame in enumerate(vid):
-                frame = cv2.resize(frame, (224, 224))
+                frame = imresize(frame, (224, 224))
                 frame = frame.astype(np.float32)
                 frame = preprocess_input(frame)
                 frames.append(frame)
@@ -115,6 +116,8 @@ if __name__ == "__main__":
             
             num_vids += 1
             print("Processed %d videos" % num_vids)
+            break
+        break
 
 
     pickle.dump(train_set, open(os.path.join(DATASET_DIR, "train_vgg16_fc1.pickle"), "wb"))
