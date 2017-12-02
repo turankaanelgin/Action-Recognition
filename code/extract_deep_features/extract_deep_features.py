@@ -59,7 +59,7 @@ def get_human_frames(ex ,dataframe):
     return frames
 
 if __name__ == "__main__":
-    FramesOFIntrest = os.path.join(DATASET_DIR, "FramesOFIntrest.csv")
+    FramesOFIntrest = os.path.join(DATASET_DIR, "FramesOfIntrest.csv")
     FramesOFIntrest_df  = read_csv(FramesOFIntrest, names=None)
 
     base_model = VGG16(weights='imagenet')
@@ -82,7 +82,6 @@ if __name__ == "__main__":
 
             frames = []
             for i, frame in enumerate(vid):
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 frame = cv2.resize(frame, (224, 224))
                 frame = frame.astype(np.float32)
                 frame = preprocess_input(frame)
