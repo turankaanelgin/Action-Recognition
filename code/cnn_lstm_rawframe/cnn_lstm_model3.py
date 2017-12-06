@@ -165,7 +165,8 @@ with tf.Session() as sess:
 	acc_train =getAUC(newTrainingLabels , FinalTrainPred)
 	acc_test = getAUC(testingLabels , FinalTestPred)
 	print("Epoch", epoch,   "Train accuracy =", acc_train,  "Test accuracy =", acc_test)
-	saver.save(sess, open(os.path.join(DATASET_DIR, "cnn_raw_frame")))
+	saver.save(sess, DATASET_DIR+"/model")
+
 
 
 
