@@ -5,10 +5,10 @@ import pickle
 from pandas import read_csv, DataFrame
 from scipy.misc.pilutil import imresize
 
-from keras.applications.vgg16 import VGG16
-from keras.preprocessing import image
-from keras.applications.vgg16 import preprocess_input
-from keras.models import Model
+import torch
+import torch.nn as nn
+from torchvision import models
+from torch.autograd import Variable
 
 CATEGORIES = ["boxing", "handclapping", "handwaving", "jogging", "running", "walking"]
 DATASET_DIR = "../../data"
@@ -59,12 +59,22 @@ def get_human_frames(ex ,dataframe):
 
     return frames
 
+def preprocess(frame):
+    # Necessary preprocess step if we use pretrained models
+    # of PyTorch.
+    frame /= 255.0
+    frame -= np.array([0.485, 0.456, 0.406], dtype=np.float32)
+    frame /= np.array([0.229, 0.224, 0.225], dtype=np.float32)
+    return frame
+
 if __name__ == "__main__":
     FramesOFIntrest = os.path.join(DATASET_DIR, "FramesOfIntrest.csv")
     FramesOFIntrest_df  = read_csv(FramesOFIntrest, names=None)
 
-    base_model = VGG16(weights='imagenet')
-    model = Model(inputs=base_model.input, outputs=base_model.get_layer('fc1').output)
+    model = models.alexnet(pretrained=True)
+    # remove last fully-connected layer
+    new_classifier = nn.Sequential(*list(model.classifier.children())[:-1])
+    model.classifier = new_classifier
 
     train_set = []
     dev_set = []
@@ -85,7 +95,6 @@ if __name__ == "__main__":
             for i, frame in enumerate(vid):
                 frame = imresize(frame, (224, 224))
                 frame = frame.astype(np.float32)
-                frame = preprocess_input(frame)
                 frames.append(frame)
 
             ex = {
@@ -96,8 +105,22 @@ if __name__ == "__main__":
             
             deep_feats = []
             for frame in frames:
-                frame = np.expand_dims(frame, axis=0)
-                deep_feat = model.predict(frame)
+                frame = preprocess(frame)
+
+                # Put channel first.
+                frame = np.transpose(frame, (2, 0, 1))
+
+                # PyTorch wants channel first.
+                frame = frame.reshape((1, 3, 224, 224))
+
+                tensor = torch.from_numpy(frame)
+                vari = Variable(tensor)
+                deep_feat = model(vari).data[0].numpy()
+                # print(deep_feat)
+                # print(deep_feat.shape)
+                # print(np.sum(deep_feat))
+                # print(np.count_nonzero(deep_feat))
+
                 deep_feats.append(deep_feat)
 
             item = {
@@ -116,11 +139,9 @@ if __name__ == "__main__":
             
             num_vids += 1
             print("Processed %d videos" % num_vids)
-            break
-        break
 
 
-    pickle.dump(train_set, open(os.path.join(DATASET_DIR, "train_vgg16_fc1.pickle"), "wb"))
-    pickle.dump(dev_set, open(os.path.join(DATASET_DIR, "dev_vgg16_fc1.pickle"), "wb"))
-    pickle.dump(test_set, open(os.path.join(DATASET_DIR, "test_vgg16_fc1.pickle"), "wb"))
+    pickle.dump(train_set, open(os.path.join(DATASET_DIR, "train_alexnet.pickle"), "wb"))
+    pickle.dump(dev_set, open(os.path.join(DATASET_DIR, "dev_alexnet.pickle"), "wb"))
+    pickle.dump(test_set, open(os.path.join(DATASET_DIR, "test_alexnet.pickle"), "wb"))
 
