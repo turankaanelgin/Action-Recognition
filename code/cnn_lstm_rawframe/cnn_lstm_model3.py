@@ -8,14 +8,14 @@ CATEGORIES = ["walking", "jogging", "running", "boxing", "handwaving", "handclap
 DATASET_DIR = "../../data"
 
 #### Parameters #####
-averagingCoffient = 1
-timestepCoffient = 15 # TODO decrease
+averagingCoffient = 10
+timestepCoffient = 5
 maxpoolShrink = 128
-n_epochs =1000
-n_layers =2
-n_neurons=20
-learning_rate=0.001
-dropout_rate = 0.9 # TODO decrease
+n_epochs = 1000
+n_layers = 2
+n_neurons = 15
+learning_rate = 0.001
+dropout_rate = 0.1
 n_outputs= len(CATEGORIES)
 ###################
 
@@ -27,53 +27,119 @@ def unison_shuffled_copies(a, b):
 def getAUC (true , output):
     correct = 0
     for i in range(true.shape[0]):
-        #print( true[i] , output[i], "true", np.argmax(true[i])+1 ,"predicted" , np.argmax(output[i])+1)
-        # print("true", np.argmax(true[i])+1 ,"predicted" , np.argmax(output[i])+1)
         if(np.argmax(true[i]) == np.argmax(output[i])):
             correct+=1
     return float(correct)/true.shape[0]
 
+def combine_data(data_x, data_y, categories):
+    optical_flows = []
+    for i in range(len(data_x)):
+        video_x = data_x[i]
+        video_y = data_y[i]
+        flows_per_video = []
+        for j in range(len(video_x)):
+            flows_x = video_x[j]
+            flows_y = video_y[j]
+            flows = list(zip(flows_x, flows_y))
+            flows_per_video.append(flows)
+        optical_flows.append({'category': categories[i],
+                              'frames': flows_per_video})
+    return optical_flows
 
 def labels2indices(label):
     oneHot = np.zeros((len(CATEGORIES),1))
     oneHot[CATEGORIES.index(label)]=1
     return oneHot
 
-def concat_data(data, flows):
+def concat_data(data, flow_x, flow_y):
 	combined_data = []
-	assert len(data) == len(flows)
+	cnt = 0
 	for i in range(len(data)):
 		frame = data[i]["frames"][1:]
-		flow = flows[i]["frames"]
-		comb = np.concatenate((frame, flow), axis=1)
-		ex = {"frames": comb, "category": data[i]["category"]}
+		flowx = flow_x[i]
+		flowy = flow_y[i]
+		frames_per_video = np.concatenate((frame, flowx), axis=1)
+		frames_per_video = np.concatenate((frames_per_video, flowy), axis=1)
+		frames_per_video = np.array(frames_per_video)
+		ex = {"frames": frames_per_video, "category": data[i]["category"]}
 		combined_data.append(ex)
+		print("Video %d was processed" % cnt)
+		cnt += 1
 	return combined_data
+
+def concat_flows(data, flow_x, flow_y):
+	combined_data = []
+	cnt = 0
+	for i in range(len(data)):
+		flowx = flow_x[i]
+		flowy = flow_y[i]
+		flows_per_video = np.concatenate((flowx, flowy), axis=1)
+		ex = {"frames": flows_per_video, "category": data[i]["category"]}
+		combined_data.append(ex)
+		print("Video %d was processed" % cnt)
+		cnt += 1
+	return combined_data
+
+def linearize_data(data):
+	linear_data = []
+	for video in data:
+		linear_frames = []
+		frames = video["frames"]
+		for frame in frames:
+			frame = np.reshape(frame, (np.size(frame), ))
+			linear_frames.append(frame)
+		linear_data.append({"frames": linear_frames, "category": video["category"]})
+	return linear_data
+
+def extract_labels(data):
+	labels = []
+	cnt = 0
+	for video in data:
+		for frame in video["frames"]:
+			labels.append(labels2indices(video["category"]))
+	return labels
+
+def extract_samples(data):
+	samples = []
+	cnt = 0
+	for video in data:
+		for frame in video["frames"]:
+			samples.append(frame)
+	return samples
 
 #Averages the frames then takes maxpool then puts them into timesteps
 def preparedata(data):
 	labels =[]
 	frames =[]
-	shrinkCof =int(8192/maxpoolShrink)
+	shrinkCof =int(216/maxpoolShrink)
 
 	for i in range (len(data)):
-		# print ("data[i][filename]" , data[i]["filename"] , "category " , data[i]["category"] ,len(data[i]["frames"]) ,data[i]["frames"][0].shape )
-		AveragedDataframes =[]
-		j=0
-		while j+averagingCoffient < len(data[i]["frames"]):
-			AveragedDataframe =  data[i]["frames"][j]
-			for k in range (1,averagingCoffient):
-				AveragedDataframe+=data[i]["frames"][j+k]
-			AveragedDataframe=AveragedDataframe/averagingCoffient
-			j+=averagingCoffient
-			AveragedDataframe =block_reduce(AveragedDataframe, (shrinkCof,), np.max)
-			# print (AveragedDataframe.shape)
-			AveragedDataframes.append(AveragedDataframe)
+		# AveragedDataframes =[]
+		# j=0
+		# while j+averagingCoffient < len(data[i]["frames"]):
+		# 	AveragedDataframe =  data[i]["frames"][j]
+		# 	for k in range (1,averagingCoffient):
+		# 		AveragedDataframe+=data[i]["frames"][j+k]
+		# 	AveragedDataframe=AveragedDataframe/averagingCoffient
+		# 	j+=averagingCoffient
+		# 	AveragedDataframe =block_reduce(AveragedDataframe, (shrinkCof, ), np.max)
+		# 	# print (AveragedDataframe.shape)
+		# 	AveragedDataframes.append(AveragedDataframe)
+        #
+		# data[i]["frames"] = AveragedDataframes
 
-		data[i]["frames"] = AveragedDataframes
-		# print ("data[i][filename]" , data[i]["filename"] , "category " , data[i]["category"] ,len(data[i]["frames"]) ,data[i]["frames"][0].shape )
-		n=0
+		# reducedFrames = []
+		# j = 0
+		# for frame in data[i]["frames"]:
+		# 	if j == 0:
+		# 		frame = block_reduce(frame, (shrinkCof,), np.max)
+		# 		reducedFrames.append(frame)
+		# 	j += 1
+		# 	if j == averagingCoffient:
+		# 		j = 0
+		# data[i]["frames"] = reducedFrames
 
+		n = 0
 		while n+timestepCoffient < len(data[i]["frames"]):
 			stepsDataframes =[]
 			for k in range (timestepCoffient):
@@ -95,7 +161,7 @@ def preparedata(data):
 
 
 with tf.name_scope("inputs"):
-	X =  tf.placeholder(tf.float32, shape=[None, timestepCoffient,maxpoolShrink], name="X")
+	X =  tf.placeholder(tf.float32, shape=[None, timestepCoffient,128], name="X")
 	y =  tf.placeholder(tf.int32, shape=[None,n_outputs], name="Y")
 	keep_prob = tf.placeholder(tf.float32)
 
@@ -130,29 +196,56 @@ with tf.name_scope("init_and_save"):
     saver = tf.train.Saver()
 
 
-train = pickle.load(open(os.path.join(DATASET_DIR, "train_alexnet.pickle"), "rb"))
-train_flows = pickle.load(open(os.path.join(DATASET_DIR, "train_flow_alexnet.pickle"), "rb"))
-train = concat_data(train, train_flows)
+# train = pickle.load(open(os.path.join(DATASET_DIR, "train_set.pickle"), "rb"))
+# train_flow_x = pickle.load(open(os.path.join(DATASET_DIR, "train_dense_flow_x.pickle"), "rb"))
+# train_flow_y = pickle.load(open(os.path.join(DATASET_DIR, "train_dense_flow_y.pickle"), "rb"))
+# train = linearize_data(train)
+# print("Training set was linearized...")
+# train = concat_flows(train, train_flow_x, train_flow_y)
+# print("Training set was concatenated...")
+# trainingSamples, trainingLabels = preparedata(train)
+# del train
+# del train_flow_x
+# del train_flow_y
+# print("Training set was loaded...")
+#
+# dev = pickle.load(open(os.path.join(DATASET_DIR, "dev_set.pickle"), "rb"))
+# dev_flow_x = pickle.load(open(os.path.join(DATASET_DIR, "dev_dense_flow_x.pickle"), "rb"))
+# dev_flow_y = pickle.load(open(os.path.join(DATASET_DIR, "dev_dense_flow_y.pickle"), "rb"))
+# dev = linearize_data(dev)
+# print("Dev set was linearized...")
+# dev = concat_flows(dev, dev_flow_x, dev_flow_y)
+# print("Dev set was concatenated...")
+# devSamples, devLabels = preparedata(dev)
+# del dev
+# del dev_flow_x
+# del dev_flow_y
+# print("Dev set was loaded...")
+#
+# test = pickle.load(open(os.path.join(DATASET_DIR, "test_set.pickle"), "rb"))
+# test_flow_x = pickle.load(open(os.path.join(DATASET_DIR, "test_dense_flow_x.pickle"), "rb"))
+# test_flow_y = pickle.load(open(os.path.join(DATASET_DIR, "test_dense_flow_y.pickle"), "rb"))
+# test = linearize_data(test)
+# print("Test set was linearized...")
+# test = concat_flows(test, test_flow_x, test_flow_y)
+# print("Test set was concatenated...")
+# testingSamples, testingLabels = preparedata(test)
+# del test
+# del test_flow_x
+# del test_flow_y
+# print("Testing set was loaded...")
+
+train = pickle.load(open(os.path.join(DATASET_DIR, "train_3dcnn.pickle"), "rb"))
 trainingSamples, trainingLabels = preparedata(train)
 del train
-del train_flows
-print("Training set was loaded...")
 
-dev = pickle.load(open(os.path.join(DATASET_DIR, "dev_alexnet.pickle"), "rb"))
-dev_flows = pickle.load(open(os.path.join(DATASET_DIR, "dev_flow_alexnet.pickle"), "rb"))
-dev = concat_data(dev, dev_flows)
+dev = pickle.load(open(os.path.join(DATASET_DIR, "dev_3dcnn.pickle"), "rb"))
 devSamples, devLabels = preparedata(dev)
 del dev
-del dev_flows
-print("Dev set was loaded...")
 
-test = pickle.load(open(os.path.join(DATASET_DIR, "test_alexnet.pickle"), "rb"))
-test_flows = pickle.load(open(os.path.join(DATASET_DIR, "test_flow_alexnet.pickle"), "rb"))
-test = concat_data(test, test_flows)
+test = pickle.load(open(os.path.join(DATASET_DIR, "test_3dcnn.pickle"), "rb"))
 testingSamples, testingLabels = preparedata(test)
 del test
-del test_flows
-print("Testing set was loaded...")
 
 newTrainingSamples = np.vstack((trainingSamples,devSamples))
 newTrainingLabels = np.vstack((trainingLabels,devLabels))
@@ -160,6 +253,9 @@ del trainingSamples
 del devSamples
 del trainingLabels
 del devLabels
+# newTrainingSamples = trainingSamples
+# newTrainingLabels = trainingLabels
+# print(np.size(trainingSamples, 0))
 
 with tf.Session() as sess:
 	init.run()
